@@ -1,4 +1,4 @@
-import random
+from random import randint
 from pygame import Vector2
 
 HEIGHT = 600
@@ -14,6 +14,7 @@ score = 0
 
 asteroid = Actor("asteroid.png")
 bullets = []
+starfield = []
 
 playing = True
 
@@ -22,13 +23,13 @@ speed_scale = 3
 def prepare_asteroid():
     global asteroid
     if spaceship.left < WIDTH // 2:
-        asteroid.x = random.randint(max(WIDTH // 2, int(spaceship.right) + 50), WIDTH - 20)
+        asteroid.x = randint(max(WIDTH // 2, int(spaceship.right) + 50), WIDTH - 20)
     else:
-        asteroid.x = random.randint(20, min(int(spaceship.left) - 50, WIDTH // 2))
-    asteroid.bottom = random.randint(asteroid.height, HEIGHT-40)
+        asteroid.x = randint(20, min(int(spaceship.left) - 50, WIDTH // 2))
+    asteroid.bottom = randint(asteroid.height, HEIGHT-40)
     score_scale = score + 3
     asteroid.speed = Vector2()
-    asteroid.speed.from_polar((random.randint(1, score_scale * speed_scale), random.randint(1, 360)) )
+    asteroid.speed.from_polar((randint(1, score_scale * speed_scale), randint(1, 360)) )
 
 
 def update_rocket_flare():
@@ -43,15 +44,18 @@ def starting_positions():
     global playing, bullets, asteroid, rocket, spaceship, score
     score = 0
     bullets = []
+    spaceship.image = "spaceship.gif"
     spaceship.speed = Vector2(0, 0)
     spaceship.angle = 180
     spaceship.x = WIDTH // 2
     spaceship.y = HEIGHT // 2
     update_rocket_flare()
     prepare_asteroid()
-    spaceship.image = "spaceship.gif"
     playing = True
 
+
+class Star:
+    __slots__ = ['x', 'y', 'speed', 'brightness']
 
 class Bullet(Actor):
     def update(self):
@@ -68,25 +72,39 @@ class Bullet(Actor):
             return True
 
 
+def prepare_starfield():
+    for n in range(200):
+        star = Star()
+        star.x = randint(0, WIDTH)
+        star.y = randint(0, HEIGHT)
+        star.speed = randint(1, 8)
+        star.brightness = 90 + star.speed * 20
+        starfield.append(star)
+
+
 def update():
     global playing, asteroid
     if playing:
         spaceship.x = (spaceship.x + spaceship.speed.x) % WIDTH
         spaceship.y = (spaceship.y + spaceship.speed.y) % HEIGHT
 
-        if playing:
-            if keyboard.left:
-                spaceship.angle += 20
-            elif keyboard.right:
-                spaceship.angle -= 20
-            if keyboard.up:
-                new_speed = Vector2()
-                new_speed.from_polar((speed_scale, 90 - spaceship.angle))
-                spaceship.speed += new_speed
-                update_rocket_flare()
-                if spaceship.speed.length_squared() > (speed_scale * 3) ** 2:
-                    spaceship.speed.scale_to_length(speed_scale * 3)
-                sounds.thrust.play()
+        if keyboard.left:
+            spaceship.angle += 20
+        elif keyboard.right:
+            spaceship.angle -= 20
+        if keyboard.up:
+            new_speed = Vector2()
+            new_speed.from_polar((speed_scale, 90 - spaceship.angle))
+            spaceship.speed += new_speed
+            update_rocket_flare()
+            if spaceship.speed.length_squared() > (speed_scale * 3) ** 2:
+                spaceship.speed.scale_to_length(speed_scale * 3)
+            sounds.thrust.play()
+
+    for star in starfield:
+        star_vec = spaceship.speed * -star.speed * 0.2
+        star.x = int(star.x + star_vec.x) % WIDTH
+        star.y = int(star.y + star_vec.y) % HEIGHT
 
     if asteroid:
         asteroid.x += asteroid.speed.x
@@ -108,9 +126,13 @@ def update():
         if hit:
             bullets.remove(bullet)
 
+
 def draw():
     """Redraw the screen."""
     screen.fill((0,0,0))
+    for star in starfield:
+        screen.draw.filled_circle((star.x, star.y), 1, (star.brightness, star.brightness, star.brightness))
+
     spaceship.draw()
 
     if keyboard.up:
@@ -124,6 +146,7 @@ def draw():
     screen.draw.text('Score: % s' % (score * 50), (20, 20))
     for bullet in bullets:
         bullet.draw()
+
 
 def on_key_down(key):
     if not playing:
@@ -140,3 +163,4 @@ def on_key_down(key):
             bullets.append(new_bullet)
 
 starting_positions()
+prepare_starfield()
