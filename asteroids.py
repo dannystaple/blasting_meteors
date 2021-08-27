@@ -13,8 +13,8 @@ bullet_image_name = 'spacemissiles_037.png'
 
 laser_sound = sounds.lasersmall_003
 thrust_sound = sounds.thrusterfire_002
-bullet_hit_asteroid_sound = sounds.explosioncrunch_003
-spaceship_crashed_sound = sounds.explosioncrunch_000
+bullet_hit_asteroid_sound = sounds.explosioncrunch_000
+spaceship_crashed_sound = sounds.explosioncrunch_003
 
 speed_scale = 1
 turn_speed = 10
@@ -60,10 +60,10 @@ class Player(Actor):
         self.x = (self.x + self.speed.x) % WIDTH
         self.y = (self.y + self.speed.y) % HEIGHT
 
-    def left(self):
+    def turn_left(self):
         spaceship.angle += turn_speed
     
-    def right(self):
+    def turn_right(self):
         spaceship.angle -= turn_speed
 
     def thrust(self):
@@ -157,9 +157,9 @@ def update():
         spaceship.update()
 
         if keyboard.left:
-            spaceship.left()
+            spaceship.turn_left()
         elif keyboard.right:
-            spaceship.right()
+            spaceship.turn_right()
         if keyboard.up:
             spaceship.thrust()
         else:
