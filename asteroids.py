@@ -8,7 +8,7 @@ WIDTH = 1000
 spaceship_image_name = 'spaceships_004_100.png'
 engine_wash_image_name = 'spaceeffects_001_100.png'
 meteor_image_name = 'spacemeteors_001_100.png'
-crashed_spaceship_image_name = "crashed_spaceship.gif"
+crashed_spaceship_image_name = "crashed_spaceship.png"
 bullet_image_name = 'spacemissiles_037.png'
 
 laser_sound = sounds.lasersmall_003
@@ -55,6 +55,36 @@ class Player(Actor):
         super().draw()
         if self.thrusting:
             self.rocket.draw()
+
+    def update(self):
+        self.x = (self.x + self.speed.x) % WIDTH
+        self.y = (self.y + self.speed.y) % HEIGHT
+
+    def left(self):
+        spaceship.angle += turn_speed
+    
+    def right(self):
+        spaceship.angle -= turn_speed
+
+    def thrust(self):
+        new_speed = Vector2()
+        new_speed.from_polar((speed_scale, 90 - self.angle))
+        self.speed += new_speed
+        self.update_rocket_flare()
+        if self.speed.length_squared() > (speed_scale * 3) ** 2:
+            self.speed.scale_to_length(speed_scale * 3)
+        if not self.thrusting:
+            thrust_sound.play()
+            self.thrusting = True
+
+    def stop_thrust(self):
+        self.thrusting = False
+        thrust_sound.stop()
+
+    def die(self):
+        self.image = crashed_spaceship_image_name
+        spaceship_crashed_sound.play()
+        self.stop_thrust()
 
 
 spaceship = Player()
@@ -122,30 +152,18 @@ def prepare_starfield():
 
 
 def update():
-    global playing, asteroid, thrusting
+    global playing, asteroid
     if playing:
-        spaceship.x = (spaceship.x + spaceship.speed.x) % WIDTH
-        spaceship.y = (spaceship.y + spaceship.speed.y) % HEIGHT
+        spaceship.update()
 
         if keyboard.left:
-            spaceship.angle += turn_speed
+            spaceship.left()
         elif keyboard.right:
-            spaceship.angle -= turn_speed
+            spaceship.right()
         if keyboard.up:
-            new_speed = Vector2()
-            new_speed.from_polar((speed_scale, 90 - spaceship.angle))
-            spaceship.speed += new_speed
-            spaceship.update_rocket_flare()
-            if spaceship.speed.length_squared() > (speed_scale * 3) ** 2:
-                spaceship.speed.scale_to_length(speed_scale * 3)
-            if not thrusting:
-                thrust_sound.play()
-                spaceship.thrusting = True
-                thrusting = True
+            spaceship.thrust()
         else:
-            thrust_sound.stop()
-            thrusting = False
-            spaceship.thrusting = False
+            spaceship.stop_thrust()
 
     for star in starfield:
         star.update(spaceship.speed)
@@ -162,11 +180,8 @@ def update():
         if asteroid.x < 0:
             asteroid.x += WIDTH
         if asteroid.colliderect(spaceship) and playing:
-            spaceship.image = crashed_spaceship_image_name
-            spaceship_crashed_sound.play()
+            spaceship.die()
             playing = False
-            thrusting = False
-            thrust_sound.stop()
     for bullet in bullets:
         hit = bullet.update()
         if hit:
