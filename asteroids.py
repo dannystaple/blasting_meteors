@@ -119,16 +119,16 @@ class Star:
     def __init__(self):
         self.x = randint(0, WIDTH)
         self.y = randint(0, HEIGHT)
-        self.speed = randint(1, 8)
+        self.speed = randint(2, 8)
         self.brightness = 90 + self.speed * 20
     
-    def update(self, spaceship_speed):
-        star_vec = spaceship_speed * -self.speed * 0.2
-        self.x = int(self.x + star_vec.x) % WIDTH
-        self.y = int(self.y + star_vec.y) % HEIGHT
+    def update(self, speed):
+        star_vec = speed * self.speed
+        self.x = (self.x + star_vec.x) % WIDTH
+        self.y = (self.y + star_vec.y) % HEIGHT
 
     def draw(self, screen):
-        screen.draw.filled_circle((self.x, self.y), 1, (self.brightness, self.brightness, self.brightness))
+        screen.draw.filled_circle((int(self.x), int(self.y)), 1, (self.brightness, self.brightness, self.brightness))
 
 
 class Bullet(Actor):
@@ -166,7 +166,7 @@ def update():
             spaceship.stop_thrust()
 
     for star in starfield:
-        star.update(spaceship.speed)
+        star.update(spaceship.speed * -0.2)
 
     if asteroid:
         asteroid.x += asteroid.speed.x
