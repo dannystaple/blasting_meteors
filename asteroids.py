@@ -4,21 +4,61 @@ from pygame import Vector2
 HEIGHT = 600
 WIDTH = 1000
 
-spaceship = Actor('spaceship.gif')
-spaceship.speed = Vector2(0, 0)
+#sprite image names
+spaceship_image_name = 'spaceships_004_100.png'
+engine_wash_image_name = 'spaceeffects_001_100.png'
+meteor_image_name = 'spacemeteors_001_100.png'
+crashed_spaceship_image_name = "crashed_spaceship.gif"
+bullet_image_name = 'spacemissiles_037.png'
 
-rocket = Actor('fireball')
-rocket.engine_radius = spaceship.height // 2 + rocket.height // 2
+laser_sound = sounds.lasersmall_003
+thrust_sound = sounds.thrusterfire_002
+bullet_hit_asteroid_sound = sounds.explosioncrunch_003
+spaceship_crashed_sound = sounds.explosioncrunch_000
+
+speed_scale = 1
+turn_speed = 10
 
 score = 0
 
-asteroid = Actor("asteroid.png")
+asteroid = Actor(meteor_image_name)
 bullets = []
 starfield = []
 
 playing = True
+thrusting = False
 
-speed_scale = 3
+
+class Player(Actor):
+    def __init__(self) -> None:
+        super().__init__(spaceship_image_name)
+        self.starting_position()
+        self.rocket = Actor(engine_wash_image_name)
+        self.rocket.engine_radius = self.height // 2 + self.rocket.height // 2
+        self.thrusting = False
+
+    def starting_position(self):
+        self.image = spaceship_image_name
+        self.speed = Vector2(0, 0)
+        self.angle = 180
+        self.x = WIDTH // 2
+        self.y = HEIGHT // 2
+        self.thrusting = False
+
+    def update_rocket_flare(self):
+        rocket_rel = Vector2()
+        rocket_rel.from_polar((self.rocket.engine_radius, 270 - self.angle))
+        self.rocket.angle = self.angle
+        self.rocket.center = (self.center[0] + rocket_rel.x, self.center[1] + rocket_rel.y)
+
+    def draw(self):
+        super().draw()
+        if self.thrusting:
+            self.rocket.draw()
+
+
+spaceship = Player()
+
 
 def prepare_asteroid():
     global asteroid
@@ -32,30 +72,34 @@ def prepare_asteroid():
     asteroid.speed.from_polar((randint(1, score_scale * speed_scale), randint(1, 360)) )
 
 
-def update_rocket_flare():
-    rocket_rel = Vector2()
-    rocket_rel.from_polar((rocket.engine_radius, 270 - spaceship.angle))
-    rocket.angle = spaceship.angle + 90
-    rocket.center = (spaceship.center[0] + rocket_rel.x, spaceship.center[1] + rocket_rel.y)
-
-
 def starting_positions():
     """Reset all game assets"""
-    global playing, bullets, asteroid, rocket, spaceship, score
+    global playing, bullets, asteroid, spaceship, score
     score = 0
     bullets = []
-    spaceship.image = "spaceship.gif"
-    spaceship.speed = Vector2(0, 0)
-    spaceship.angle = 180
-    spaceship.x = WIDTH // 2
-    spaceship.y = HEIGHT // 2
-    update_rocket_flare()
+    spaceship.starting_position()
+    spaceship.update_rocket_flare()
     prepare_asteroid()
     playing = True
 
 
 class Star:
     __slots__ = ['x', 'y', 'speed', 'brightness']
+
+    def __init__(self):
+        self.x = randint(0, WIDTH)
+        self.y = randint(0, HEIGHT)
+        self.speed = randint(1, 8)
+        self.brightness = 90 + self.speed * 20
+    
+    def update(self, spaceship_speed):
+        star_vec = spaceship_speed * -self.speed * 0.2
+        self.x = int(self.x + star_vec.x) % WIDTH
+        self.y = int(self.y + star_vec.y) % HEIGHT
+
+    def draw(self, screen):
+        screen.draw.filled_circle((self.x, self.y), 1, (self.brightness, self.brightness, self.brightness))
+
 
 class Bullet(Actor):
     def update(self):
@@ -64,7 +108,7 @@ class Bullet(Actor):
         self.x += self.speed.x
         self.y += self.speed.y
         if asteroid and self.colliderect(asteroid):
-            sounds.blast.play()
+            bullet_hit_asteroid_sound.play()
             prepare_asteroid()
             score += 1
             return True
@@ -74,37 +118,37 @@ class Bullet(Actor):
 
 def prepare_starfield():
     for n in range(200):
-        star = Star()
-        star.x = randint(0, WIDTH)
-        star.y = randint(0, HEIGHT)
-        star.speed = randint(1, 8)
-        star.brightness = 90 + star.speed * 20
-        starfield.append(star)
+        starfield.append(Star())
 
 
 def update():
-    global playing, asteroid
+    global playing, asteroid, thrusting
     if playing:
         spaceship.x = (spaceship.x + spaceship.speed.x) % WIDTH
         spaceship.y = (spaceship.y + spaceship.speed.y) % HEIGHT
 
         if keyboard.left:
-            spaceship.angle += 20
+            spaceship.angle += turn_speed
         elif keyboard.right:
-            spaceship.angle -= 20
+            spaceship.angle -= turn_speed
         if keyboard.up:
             new_speed = Vector2()
             new_speed.from_polar((speed_scale, 90 - spaceship.angle))
             spaceship.speed += new_speed
-            update_rocket_flare()
+            spaceship.update_rocket_flare()
             if spaceship.speed.length_squared() > (speed_scale * 3) ** 2:
                 spaceship.speed.scale_to_length(speed_scale * 3)
-            sounds.thrust.play()
+            if not thrusting:
+                thrust_sound.play()
+                spaceship.thrusting = True
+                thrusting = True
+        else:
+            thrust_sound.stop()
+            thrusting = False
+            spaceship.thrusting = False
 
     for star in starfield:
-        star_vec = spaceship.speed * -star.speed * 0.2
-        star.x = int(star.x + star_vec.x) % WIDTH
-        star.y = int(star.y + star_vec.y) % HEIGHT
+        star.update(spaceship.speed)
 
     if asteroid:
         asteroid.x += asteroid.speed.x
@@ -117,10 +161,12 @@ def update():
             asteroid.x -= WIDTH
         if asteroid.x < 0:
             asteroid.x += WIDTH
-        if asteroid.colliderect(spaceship):
-            spaceship.image = "crashed_spaceship.gif"
-            sounds.bomb.play()
+        if asteroid.colliderect(spaceship) and playing:
+            spaceship.image = crashed_spaceship_image_name
+            spaceship_crashed_sound.play()
             playing = False
+            thrusting = False
+            thrust_sound.stop()
     for bullet in bullets:
         hit = bullet.update()
         if hit:
@@ -131,12 +177,10 @@ def draw():
     """Redraw the screen."""
     screen.fill((0,0,0))
     for star in starfield:
-        screen.draw.filled_circle((star.x, star.y), 1, (star.brightness, star.brightness, star.brightness))
+        star.draw(screen)
 
     spaceship.draw()
 
-    if keyboard.up:
-        rocket.draw()
     if asteroid:
         asteroid.draw()
     if not playing:
@@ -155,11 +199,12 @@ def on_key_down(key):
         return
     elif key == keys.SPACE:
         if len(bullets) < 10:
-            new_bullet = Bullet('bullet')
+            new_bullet = Bullet(bullet_image_name)
             new_bullet.speed = Vector2()
             new_bullet.speed.from_polar((5 * speed_scale, 90 - spaceship.angle))
+            new_bullet.angle = spaceship.angle
             new_bullet.pos = spaceship.pos + new_bullet.speed
-            music.play_once("laser5")
+            laser_sound.play()
             bullets.append(new_bullet)
 
 starting_positions()
